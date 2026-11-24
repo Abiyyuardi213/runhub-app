@@ -51,18 +51,18 @@ export default function AdminPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [scrapeUrl, setScrapeUrl] = useState("https://www.semarangmountainrace.com/");
   const [scraping, setScraping] = useState(false);
   const [scrapeResult, setScrapeResult] = useState<any>(null);
 
   // Form New Event
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [category, setCategory] = useState("FM");
-  const [distanceKm, setDistanceKm] = useState("42.195");
-  const [elevationGain, setElevationGain] = useState("200");
-  const [cutOffHours, setCutOffHours] = useState("7");
-  const [location, setLocation] = useState("");
+  const [category, setCategory] = useState("ULTRA");
+  const [distanceKm, setDistanceKm] = useState("82");
+  const [elevationGain, setElevationGain] = useState("5660");
+  const [cutOffHours, setCutOffHours] = useState("25");
+  const [location, setLocation] = useState("The Wujil Resort, Ungaran - Semarang");
   const [creating, setCreating] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
 
@@ -116,16 +116,39 @@ export default function AdminPage() {
         if (data.scraped.suggestedCategory) setCategory(data.scraped.suggestedCategory);
         if (data.scraped.suggestedDistance)
           setDistanceKm((data.scraped.suggestedDistance / 1000).toString());
+        if (data.scraped.suggestedElevationGain)
+          setElevationGain(data.scraped.suggestedElevationGain.toString());
         if (data.scraped.suggestedCutOffHours)
           setCutOffHours(data.scraped.suggestedCutOffHours.toString());
+        if (data.scraped.location) setLocation(data.scraped.location);
+
+        // Jika terdapat daftar multi-kategori (seperti SMR 82K, 52K, 30K, dst)
+        if (data.scraped.categories && data.scraped.categories.length > 0) {
+          applyCategory(data.scraped.categories[0]);
+        }
       } else {
-        setFeedbackMsg(data.error || "Gagal mengambil metadata.");
+        setFeedbackMsg(data.error || data.details || "Gagal mengambil metadata.");
       }
     } catch (err: any) {
       setFeedbackMsg(err.message || "Error saat scraping.");
     } finally {
       setScraping(false);
     }
+  };
+
+  const applyCategory = (cat: any) => {
+    setName(cat.name);
+    setSlug(
+      cat.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+    );
+    setCategory(cat.category);
+    setDistanceKm(cat.distanceKm.toString());
+    setElevationGain(cat.elevationGain.toString());
+    setCutOffHours(cat.cutOffHours.toString());
+    if (cat.location) setLocation(cat.location);
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -150,12 +173,7 @@ export default function AdminPage() {
       });
       const d = await res.json();
       if (res.ok) {
-        setFeedbackMsg("Event berhasil ditambahkan!");
-        setName("");
-        setSlug("");
-        setLocation("");
-        setScrapeUrl("");
-        setScrapeResult(null);
+        setFeedbackMsg(`Berhasil! Event '${name}' telah disimpan.`);
         loadData();
       } else {
         setFeedbackMsg(d.error || "Gagal menambahkan event.");
@@ -198,7 +216,7 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <h1 className="font-bold text-lg leading-none">Admin Control Center</h1>
-                  <span className="text-xs text-slate-500 font-medium">RunHub Management</span>
+                  <span className="text-xs text-slate-500 font-medium">RunHub Event Management</span>
                 </div>
               </div>
             </div>
@@ -218,7 +236,7 @@ export default function AdminPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Metric Cards (merbabudev style) */}
+        {/* Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-2">
@@ -267,7 +285,7 @@ export default function AdminPage() {
 
         {/* 2-Column: Event Importer & Create Form */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-          {/* URL Scraper / AI Importer */}
+          {/* URL Scraper / Multi-Category Auto Importer */}
           <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-bold uppercase tracking-wider mb-3">
               <Sparkles className="w-3.5 h-3.5" />
@@ -275,7 +293,7 @@ export default function AdminPage() {
             </div>
             <h2 className="text-lg font-bold text-slate-900 mb-2">Ambil dari Website Lomba</h2>
             <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-              Masukkan link website resmi lomba lari untuk otomatis menarik judul, deskripsi, estimasi jarak dan Cut-Off Time.
+              Masukkan URL lomba (contoh: <code className="bg-slate-100 px-1 py-0.5 rounded text-brand-600">semarangmountainrace.com</code>) untuk mendeteksi semua kategori jarak, elevasi, dan Cut-Off Time secara otomatis.
             </p>
 
             <div className="space-y-3">
@@ -283,7 +301,7 @@ export default function AdminPage() {
                 <label className="text-xs font-semibold text-slate-700 block mb-1">URL Website Lomba</label>
                 <input
                   type="url"
-                  placeholder="https://borobudurmarathon.com..."
+                  placeholder="https://www.semarangmountainrace.com/"
                   value={scrapeUrl}
                   onChange={(e) => setScrapeUrl(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
@@ -294,12 +312,12 @@ export default function AdminPage() {
                 type="button"
                 onClick={handleScrape}
                 disabled={scraping || !scrapeUrl}
-                className="w-full py-2.5 px-4 bg-brand-900 hover:bg-brand-800 disabled:opacity-50 text-white font-medium text-xs rounded-lg transition flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 bg-brand-900 hover:bg-brand-800 disabled:opacity-50 text-white font-medium text-xs rounded-lg transition flex items-center justify-center gap-2 shadow-sm"
               >
                 {scraping ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Mengekstrak Metadata...</span>
+                    <span>Mengambil Kategori Lomba...</span>
                   </>
                 ) : (
                   <>
@@ -309,12 +327,36 @@ export default function AdminPage() {
                 )}
               </button>
 
-              {scrapeResult && (
-                <div className="mt-4 p-3 bg-brand-50 border border-brand-100 rounded-xl text-xs space-y-1">
-                  <div className="font-semibold text-brand-900">Hasil Deteksi:</div>
-                  <div className="text-slate-700">Kategori: <strong className="uppercase">{scrapeResult.suggestedCategory}</strong></div>
-                  <div className="text-slate-700">Estimasi Jarak: <strong>{scrapeResult.suggestedDistance / 1000} km</strong></div>
-                  <div className="text-slate-700">Estimasi COT: <strong>{scrapeResult.suggestedCutOffHours} jam</strong></div>
+              {scrapeResult && scrapeResult.categories && (
+                <div className="mt-4 p-3 bg-brand-50 border border-brand-200 rounded-xl text-xs space-y-2">
+                  <div className="font-bold text-brand-900 flex items-center justify-between">
+                    <span>Pilih Kategori Terdeteksi:</span>
+                    <span className="text-[10px] bg-brand-200 text-brand-800 px-1.5 py-0.5 rounded">
+                      {scrapeResult.categories.length} Kategori
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pt-1">
+                    {scrapeResult.categories.map((c: any) => (
+                      <button
+                        key={c.categoryKey}
+                        type="button"
+                        onClick={() => applyCategory(c)}
+                        className="w-full text-left p-2 rounded-lg bg-white border border-brand-200 hover:border-brand-500 hover:bg-brand-100/50 transition flex items-center justify-between group"
+                      >
+                        <div>
+                          <div className="font-semibold text-slate-900 group-hover:text-brand-600">
+                            {c.name}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            {c.distanceKm} km • +{c.elevationGain}m EG • COT {c.cutOffHours} jam
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-brand-700 bg-brand-50 px-2 py-1 rounded">
+                          Terapkan
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -324,16 +366,17 @@ export default function AdminPage() {
           <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider mb-3">
               <Plus className="w-3.5 h-3.5" />
-              Event Master
+              Event Editor
             </div>
-            <h2 className="text-lg font-bold text-slate-900 mb-1">Tambah Master Event Lari</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Simpan Master Event Lari</h2>
             <p className="text-xs text-slate-500 mb-6">
-              Parameter ini digunakan oleh Race Readiness Engine untuk menilai kesiapan peserta.
+              Data ini akan menjadi standar kualifikasi untuk Race Readiness Engine pelari.
             </p>
 
             {feedbackMsg && (
-              <div className="mb-4 p-3 bg-blue-50 text-blue-800 text-xs rounded-lg border border-blue-200">
-                {feedbackMsg}
+              <div className="mb-4 p-3 bg-blue-50 text-blue-800 text-xs rounded-lg border border-blue-200 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-blue-600" />
+                <span>{feedbackMsg}</span>
               </div>
             )}
 
@@ -343,7 +386,7 @@ export default function AdminPage() {
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Borobudur Marathon 2025 - Full Marathon"
+                  placeholder="Contoh: Semarang Mountain Race 2027 - SMR Ultra 82K"
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -360,7 +403,7 @@ export default function AdminPage() {
                 <input
                   type="text"
                   required
-                  placeholder="borobudur-marathon-2025-fm"
+                  placeholder="semarang-mountain-race-2027-smr-82k"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
@@ -378,7 +421,7 @@ export default function AdminPage() {
                   <option value="10K">10K (10.000 meter)</option>
                   <option value="HM">Half Marathon (21.097 meter)</option>
                   <option value="FM">Full Marathon (42.195 meter)</option>
-                  <option value="ULTRA">Ultra Marathon (Trail / Road)</option>
+                  <option value="ULTRA">Ultra Marathon (Trail / Mountain)</option>
                 </select>
               </div>
 
@@ -400,7 +443,6 @@ export default function AdminPage() {
                   type="number"
                   step="0.1"
                   required
-                  placeholder="7"
                   value={cutOffHours}
                   onChange={(e) => setCutOffHours(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
@@ -408,7 +450,7 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Elevation Gain (Meter)</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Elevation Gain (Meter Kumulatif)</label>
                 <input
                   type="number"
                   value={elevationGain}
@@ -421,7 +463,7 @@ export default function AdminPage() {
                 <label className="text-xs font-semibold text-slate-700 block mb-1">Lokasi Lomba</label>
                 <input
                   type="text"
-                  placeholder="Magelang, Jawa Tengah"
+                  placeholder="Ungaran, Semarang"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-brand-500"
@@ -442,12 +484,12 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Event List Table (merbabudev style) */}
+        {/* Event List Table */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="font-bold text-slate-900 text-base">Katalog Event Terdaftar</h2>
-              <p className="text-xs text-slate-500">Daftar lomba yang siap dipilih oleh pelari</p>
+              <p className="text-xs text-slate-500">Daftar lomba yang siap dianalisis terhadap performa Strava</p>
             </div>
             <div className="text-xs text-slate-500 font-medium">
               Total {events.length} event
@@ -461,7 +503,7 @@ export default function AdminPage() {
             </div>
           ) : events.length === 0 ? (
             <div className="p-12 text-center text-slate-500 text-sm">
-              Belum ada event. Tambahkan event pertama Anda menggunakan form di atas.
+              Belum ada event tersimpan di database MySQL. Anda dapat mengisi form atau klik "Fetch Data Otomatis" di atas lalu klik "Simpan Master Event".
             </div>
           ) : (
             <div className="overflow-x-auto">
