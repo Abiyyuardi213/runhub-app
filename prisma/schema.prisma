@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ActivityType {
+  RUN
+  TRAIL_RUN
+  VIRTUAL_RUN
+  WALK
+  HIKE
+  OTHER
+}
+
+model User {
+  id            String          @id @default(uuid())
+  name          String?
+  email         String?         @unique
+  role          Role            @default(USER)
+  stravaId      BigInt?         @unique
+  profileImage  String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  stravaAccount StravaAccount?
+  activities    Activity[]
+  assessments   RaceAssessment[]
+
+  @@map("users")
+}
+
+model StravaAccount {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
+  expiresAt    Int
+  scope        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("strava_accounts")
+}
+
+model Activity {
+  id             String       @id @default(uuid())
+  userId         String
+  stravaId       BigInt       @unique
+  name           String
+  type           ActivityType @default(RUN)
+  startDate      DateTime
+  distance       Float        // meters
+  movingTime     Int          // seconds
+  elapsedTime    Int          // seconds
+  totalElevation Float        // meters
+  averageSpeed   Float        // meters per second
+  maxSpeed       Float?       // meters per second
+  averageHr      Float?
+  maxHr          Float?
+  rawPayload     Json?        // snapshot data asli Strava
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startDate])
+  @@map("activities")
+}
+
+model Event {
+  id             String           @id @default(uuid())
+  name           String
+  slug           String           @unique
+  description    String?          @db.Text
+  category       String           // e.g., 5K, 10K, HM (21K), FM (42K), Ultra (50K, 100K)
+  eventType      String           @default("ROAD") // ROAD, TRAIL, OBSTACLE
+  distance       Float            // meters (e.g. 42195)
+  elevationGain  Float            @default(0) // meters
+  cutOffTime     Int              // in seconds
+  location       String?
+  eventDate      DateTime?
+  sourceUrl      String?          // URL web event rujukan
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  assessments    RaceAssessment[]
+
+  @@map("events")
+}
+
+model RaceAssessment {
+  id                   String   @id @default(uuid())
+  userId               String
+  eventId              String
+  readinessScore       Float    // 0 - 100
+  verdict              String   // READY, RISKY, NOT_READY
+  predictedFinishTime  Int?     // seconds
+  minRequiredPace      Float    // min/km
+  userAvgPace          Float    // min/km
+  longestRunKm         Float    // km
+  weeklyMileageAvgKm   Float    // km
+  gapAnalysisNotes     Json?    // Array string rekomendasi/kekurangan
+  calculatedAt         DateTime @default(now())
+
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event                Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([userId, eventId])
+  @@map("race_assessments")
+}
